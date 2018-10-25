@@ -1,9 +1,11 @@
-﻿import { EventForDotNet, UIEventArgs } from './EventForDotNet';
+import { EventForDotNet, UIEventArgs } from './EventForDotNet';
 
 const nonBubblingEvents = toLookup([
   'abort', 'blur', 'change', 'error', 'focus', 'load', 'loadend', 'loadstart', 'mouseenter', 'mouseleave',
   'progress', 'reset', 'scroll', 'submit', 'unload', 'DOMNodeInsertedIntoDocument', 'DOMNodeRemovedFromDocument'
 ]);
+
+const preventDefaultAttribute = "bl-preventdefault";
 
 export interface OnEventCallback {
   (event: Event, componentId: number, eventHandlerId: number, eventArgs: EventForDotNet<UIEventArgs>): void;
@@ -74,6 +76,12 @@ export class EventDelegator {
       if (candidateElement.hasOwnProperty(this.eventsCollectionKey)) {
         const handlerInfos = candidateElement[this.eventsCollectionKey];
         if (handlerInfos.hasOwnProperty(evt.type)) {
+          const blPreventDefault = candidateElement.getAttribute(preventDefaultAttribute);
+          if (blPreventDefault) {
+            if (blPreventDefault.split(",").indexOf(evt.type)>-1) {
+              evt.preventDefault();
+            }
+          }
           // We are going to raise an event for this element, so prepare info needed by the .NET code
           if (!eventArgs) {
             eventArgs = EventForDotNet.fromDOMEvent(evt);
