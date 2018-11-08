@@ -1,5 +1,5 @@
 import { MethodHandle, System_Object, System_String, System_Array, Pointer, Platform } from '../Platform';
-import { getAssemblyNameFromUrl, getFileNameFromUrl } from '../Url';
+import { getFileNameFromUrl } from '../Url';
 import { attachDebuggerHotkey, hasDebuggingEnabled } from './MonoDebugger';
 
 const assemblyHandleCache: { [assemblyName: string]: number } = {};
@@ -175,21 +175,13 @@ function findMethod(assemblyName: string, namespace: string, className: string, 
 }
 
 function addScriptTagsToDocument() {
-  // Load either the wasm or asm.js version of the Mono runtime
   const browserSupportsNativeWebAssembly = typeof WebAssembly !== 'undefined' && WebAssembly.validate;
-  const monoRuntimeUrlBase = '_framework/' + (browserSupportsNativeWebAssembly ? 'wasm' : 'asmjs');
-  const monoRuntimeScriptUrl = `${monoRuntimeUrlBase}/mono.js`;
-
   if (!browserSupportsNativeWebAssembly) {
-    // In the asmjs case, the initial memory structure is in a separate file we need to download
-    const meminitXHR = Module['memoryInitializerRequest'] = new XMLHttpRequest();
-    meminitXHR.open('GET', `${monoRuntimeUrlBase}/mono.js.mem`);
-    meminitXHR.responseType = 'arraybuffer';
-    meminitXHR.send(undefined);
+    throw new Error('This browser does not support WebAssembly.');
   }
 
   const scriptElem = document.createElement('script');
-  scriptElem.src = monoRuntimeScriptUrl;
+  scriptElem.src = '_framework/wasm/mono.js';
   scriptElem.defer = true;
   document.body.appendChild(scriptElem);
 }
@@ -197,7 +189,6 @@ function addScriptTagsToDocument() {
 function createEmscriptenModuleInstance(loadAssemblyUrls: string[], onReady: () => void, onError: (reason?: any) => void) {
   const module = {} as typeof Module;
   const wasmBinaryFile = '_framework/wasm/mono.wasm';
-  const asmjsCodeFile = '_framework/asmjs/mono.asm.js';
   const suppressMessages = ['DEBUGGING ENABLED'];
 
   module.print = line => (suppressMessages.indexOf(line) < 0 && console.log(`WASM: ${line}`));
@@ -209,13 +200,13 @@ function createEmscriptenModuleInstance(loadAssemblyUrls: string[], onReady: () 
   module.locateFile = fileName => {
     switch (fileName) {
       case 'mono.wasm': return wasmBinaryFile;
-      case 'mono.asm.js': return asmjsCodeFile;
       default: return fileName;
     }
   };
 
   module.preRun.push(() => {
     // By now, emscripten should be initialised enough that we can capture these methods for later use
+    const mono_wasm_add_assembly = Module.cwrap('mono_wasm_add_assembly', null, ['string', 'number', 'number']);
     assembly_load = Module.cwrap('mono_wasm_assembly_load', 'number', ['string']);
     find_class = Module.cwrap('mono_wasm_assembly_find_class', 'number', ['number', 'string', 'string']);
     find_method = Module.cwrap('mono_wasm_assembly_find_method', 'number', ['number', 'string', 'number']);
@@ -223,7 +214,6 @@ function createEmscriptenModuleInstance(loadAssemblyUrls: string[], onReady: () 
     mono_string_get_utf8 = Module.cwrap('mono_wasm_string_get_utf8', 'number', ['number']);
     mono_string = Module.cwrap('mono_wasm_string_from_js', 'number', ['string']);
 
-    Module.FS_createPath('/', appBinDirName, true, true);
     MONO.loaded_files = [];
 
     loadAssemblyUrls.forEach(url => {
@@ -232,7 +222,10 @@ function createEmscriptenModuleInstance(loadAssemblyUrls: string[], onReady: () 
       addRunDependency(runDependencyId);
       asyncLoad(url).then(
         data => {
-          Module.FS_createDataFile(appBinDirName, filename, data, true, false, false);
+          const heapAddress = Module._malloc(data.length);
+          const heapMemory = new Uint8Array(Module.HEAPU8.buffer, heapAddress, data.length);
+          heapMemory.set(data);
+          mono_wasm_add_assembly(filename, heapAddress, data.length);
           MONO.loaded_files.push(toAbsoluteUrl(url));
           removeRunDependency(runDependencyId);
         },
@@ -270,7 +263,7 @@ function toAbsoluteUrl(possiblyRelativeUrl: string) {
 }
 
 function asyncLoad(url) {
-  return new Promise((resolve, reject) => {
+  return new Promise<Uint8Array>((resolve, reject) => {
     var xhr = new XMLHttpRequest;
     xhr.open('GET', url, /* async: */ true);
     xhr.responseType = 'arraybuffer';
