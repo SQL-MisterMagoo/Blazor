@@ -28,6 +28,7 @@ function boot() {
   });
 
   connection.on('JS.Error', unhandledError);
+  connection.on('close', restart);
 
   connection.start()
     .then(async () => {
@@ -65,6 +66,16 @@ function unhandledError(err) {
   if (connection) {
     connection.stop();
   }
+  restart();
 }
 
+async function restart() {
+  try {
+    await connection.start()
+    console.log('connected')
+  } catch (err) {
+    console.log(err)
+    setTimeout(() => restart(), 5000)
+  }
+}
 boot();
