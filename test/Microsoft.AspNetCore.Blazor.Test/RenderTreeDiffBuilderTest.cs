@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Blazor.Test.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Blazor.Test
@@ -1268,7 +1269,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
             var newComponentInstance = (FakeComponent)oldTree.GetFrames().Array[0].Component;
 
             // Assert
-            Assert.Equal(1, renderBatch.UpdatedComponents.Count); // Because the diff builder only queues child component renders; it doesn't actually perfom them itself
+            Assert.Equal(1, renderBatch.UpdatedComponents.Count); // Because the diff builder only queues child component renders; it doesn't actually perform them itself
             Assert.Same(originalComponentInstance, newComponentInstance);
             Assert.Equal("String did change", newComponentInstance.StringProperty);
             Assert.Same(objectWillNotChange, newComponentInstance.ObjectProperty);
@@ -1530,9 +1531,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
             {
             }
 
-            protected override void UpdateDisplay(in RenderBatch renderBatch)
-            {
-            }
+            protected override Task UpdateDisplayAsync(in RenderBatch renderBatch)
+                => Task.CompletedTask;
         }
 
         private class FakeComponent : IComponent

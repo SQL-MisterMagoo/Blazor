@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Blazor.Server
@@ -213,7 +214,7 @@ namespace Microsoft.AspNetCore.Blazor.Server
 
                     // Testing deduplication
                     RenderTreeFrame.Attribute(134, "Attribute with string value", "String value"),
-                    RenderTreeFrame.Element(135, "Some element") // Will be dedupliated
+                    RenderTreeFrame.Element(135, "Some element") // Will be deduplicated
                         .WithElementSubtreeLength(999),
                     RenderTreeFrame.Text(136, "Some text"), // Will not be deduplicated
                     RenderTreeFrame.Markup(137, "Some markup"), // Will not be deduplicated
@@ -376,7 +377,7 @@ namespace Microsoft.AspNetCore.Blazor.Server
             {
             }
 
-            protected override void UpdateDisplay(in RenderBatch renderBatch)
+            protected override Task UpdateDisplayAsync(in RenderBatch renderBatch)
                 => throw new NotImplementedException();
         }
     }
