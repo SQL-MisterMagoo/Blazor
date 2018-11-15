@@ -20,14 +20,18 @@ namespace Microsoft.AspNetCore.Blazor.Build
             { "blazor:file:", EmbeddedResourceKind.Static },
         };
 
-        /// <summary>
-        /// Finds Blazor-specific embedded resources in the specified assemblies, writes them
-        /// to disk, and returns a description of those resources in dependency order.
-        /// </summary>
-        /// <param name="referencedAssemblyPaths">The paths to assemblies that may contain embedded resources.</param>
-        /// <param name="outputDir">The path to the directory where output is being written.</param>
-        /// <returns>A description of the embedded resources that were written to disk.</returns>
-        public static IReadOnlyList<EmbeddedResourceInfo> ExtractEmbeddedResources(
+		private readonly static Dictionary<string, EmbeddedResourceKind> _knownResourceKindsByExtension = new Dictionary<string, EmbeddedResourceKind>
+				{
+						{ ".json", EmbeddedResourceKind.Static },
+				};
+		/// <summary>
+		/// Finds Blazor-specific embedded resources in the specified assemblies, writes them
+		/// to disk, and returns a description of those resources in dependency order.
+		/// </summary>
+		/// <param name="referencedAssemblyPaths">The paths to assemblies that may contain embedded resources.</param>
+		/// <param name="outputDir">The path to the directory where output is being written.</param>
+		/// <returns>A description of the embedded resources that were written to disk.</returns>
+		public static IReadOnlyList<EmbeddedResourceInfo> ExtractEmbeddedResources(
             IEnumerable<string> referencedAssemblyPaths, string outputDir)
         {
             // Clean away any earlier state
@@ -117,7 +121,17 @@ namespace Microsoft.AspNetCore.Blazor.Build
                 }
             }
 
-            kind = default;
+			foreach (var kvp in _knownResourceKindsByExtension)
+			{
+				if (logicalName.EndsWith(kvp.Key, StringComparison.Ordinal))
+				{
+					kind = kvp.Value;
+					resolvedName = logicalName;
+					return true;
+				}
+			}
+
+			kind = default;
             resolvedName = default;
             return false;
         }
